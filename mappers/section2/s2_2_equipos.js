@@ -10,7 +10,6 @@ function s2_2(hojaDestino, fEquip, filaReferenciaAnterior) {
     });
 
     let filaActual = filaSeccion !== -1 ? filaSeccion + 2 : filaReferenciaAnterior + 5;
-    if (!fEquip) return filaActual;
 
     const estiloBold = { name: 'Arial', size: 11, bold: true };
     const bloquesEquipos = [
@@ -21,22 +20,18 @@ function s2_2(hojaDestino, fEquip, filaReferenciaAnterior) {
     ];
 
     const FILA_BASE_PLANTILLA = filaActual;
+    const normalizarDato = (cell) => {
+        if (!cell || cell.value === null || cell.value === undefined) return 'NA';
+        const texto = cell.text.trim();
+        return texto === '' || texto.toUpperCase() === 'NA' || texto === '-' ? 'NA' : cell.value;
+    };
+    const tieneDato = (cell) => {
+        if (!cell || cell.value === null || cell.value === undefined) return false;
+        const texto = cell.text.trim();
+        return texto !== '' && texto.toUpperCase() !== 'NA' && texto !== '-';
+    };
 
-    bloquesEquipos.forEach((bloque, index) => {
-        const celdaNombre = fEquip.getCell(bloque.fijo);
-        const celdaPrimerDato = fEquip.getCell(bloque.datos[0]);
-        
-        // --- BLINDAJE: Conversión segura a String ---
-        const valorNombreRaw = celdaNombre.value ? celdaNombre.value.toString().trim() : "";
-        const valorDatoRaw = celdaPrimerDato.value ? celdaPrimerDato.value.toString().trim() : "";
-
-        // Si es NA, lo ignoramos totalmente
-        if (valorNombreRaw.toUpperCase() === 'NA') return;
-
-        // Si el nombre está vacío y no es el primer equipo, no saturamos el acta
-        if (valorNombreRaw === "" && index > 0) return;
-
-        // Insertar fila física
+    const escribirFila = (datos) => {
         if (filaActual > FILA_BASE_PLANTILLA) {
             hojaDestino.insertRow(filaActual, {});
         }
@@ -46,38 +41,71 @@ function s2_2(hojaDestino, fEquip, filaReferenciaAnterior) {
         limpiarMergesFila(hojaDestino, filaActual);
         aplicarEstiloCelda(row);
 
-        // Lógica de datos inválidos (o vacíos)
-        const esInvalido = valorDatoRaw === "" || 
-                           valorDatoRaw === "-" || 
-                           valorDatoRaw === "0" || 
-                           valorDatoRaw.toUpperCase() === "NA";
-
-        // Asignar Nombre del equipo (si está vacío, ponemos guion para el formato)
-        row.getCell('B').value = valorNombreRaw || "-";
+        const valores = [
+            ['B', datos.equipo],
+            ['E', datos.marca],
+            ['G', datos.modelo],
+            ['I', datos.serie],
+            ['K', datos.comentarios]
+        ];
+        valores.forEach(([columna, valor]) => {
+            const cell = row.getCell(columna);
+            cell.value = valor;
+            if (valor === 'NA') {
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            }
+        });
         row.getCell('B').font = estiloBold;
-        row.getCell('B').alignment = { horizontal: 'left', vertical: 'middle' };
-
-        if (esInvalido) {
-            row.getCell('E').value = "-"; 
-            row.getCell('G').value = "-"; 
-            row.getCell('I').value = "-"; 
-            row.getCell('K').value = "-"; 
-        } else {
-            row.getCell('E').value = celdaPrimerDato.value || "-"; 
-            row.getCell('G').value = fEquip.getCell(bloque.datos[1]).value || "-"; 
-            row.getCell('I').value = fEquip.getCell(bloque.datos[2]).value || "-"; 
-            row.getCell('K').value = fEquip.getCell(bloque.datos[3]).value || "-"; 
+        if (datos.equipo !== 'NA') {
+            row.getCell('B').alignment = { horizontal: 'left', vertical: 'middle' };
         }
 
         try {
-            hojaDestino.mergeCells(filaActual, 2, filaActual, 4);   
-            hojaDestino.mergeCells(filaActual, 5, filaActual, 6);   
-            hojaDestino.mergeCells(filaActual, 7, filaActual, 8);   
-            hojaDestino.mergeCells(filaActual, 9, filaActual, 10);  
-            hojaDestino.mergeCells(filaActual, 11, filaActual, 13); 
+            hojaDestino.mergeCells(filaActual, 2, filaActual, 4);
+            hojaDestino.mergeCells(filaActual, 5, filaActual, 6);
+            hojaDestino.mergeCells(filaActual, 7, filaActual, 8);
+            hojaDestino.mergeCells(filaActual, 9, filaActual, 10);
+            hojaDestino.mergeCells(filaActual, 11, filaActual, 13);
         } catch (e) { }
 
         filaActual++;
+    };
+
+    if (!fEquip) {
+        escribirFila({
+            equipo: 'NA',
+            marca: 'NA',
+            modelo: 'NA',
+            serie: 'NA',
+            comentarios: 'NA'
+        });
+        return filaActual;
+    }
+
+    const bloquesConDatos = bloquesEquipos.filter((bloque) =>
+        bloque.datos.some((columna) => tieneDato(fEquip.getCell(columna)))
+    );
+
+    if (bloquesConDatos.length === 0) {
+        escribirFila({
+            equipo: 'NA',
+            marca: 'NA',
+            modelo: 'NA',
+            serie: 'NA',
+            comentarios: 'NA'
+        });
+        return filaActual;
+    }
+
+    bloquesConDatos.forEach((bloque) => {
+        const celdaNombre = fEquip.worksheet.getRow(3).getCell(bloque.fijo);
+        escribirFila({
+            equipo: normalizarDato(celdaNombre),
+            marca: normalizarDato(fEquip.getCell(bloque.datos[0])),
+            modelo: normalizarDato(fEquip.getCell(bloque.datos[1])),
+            serie: normalizarDato(fEquip.getCell(bloque.datos[2])),
+            comentarios: normalizarDato(fEquip.getCell(bloque.datos[3]))
+        });
     });
 
     return filaActual;
