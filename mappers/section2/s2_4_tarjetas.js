@@ -10,28 +10,17 @@ function s2_4(hojaDestino, fEquip, filaReferenciaAnterior) {
     });
 
     let filaActual = filaSeccion !== -1 ? filaSeccion + 2 : filaReferenciaAnterior + 3;
-    if (!fEquip) return filaActual;
-
     const FILA_BASE_PLANTILLA = filaActual;
     const iniciosColumnas = ['UC', 'UJ', 'UQ', 'UX', 'VE', 'VL'];
     let itemCorrelativo = 1;
 
-   iniciosColumnas.forEach((letraInicio, index) => {
-        const celdaMatrizBase = fEquip.getCell(letraInicio);
-        const valorRef = celdaMatrizBase.value;
+    const esVacio = (valor) => {
+        if (valor === null || valor === undefined) return true;
+        const texto = valor.toString().trim().toUpperCase();
+        return texto === '' || texto === 'NA' || texto === '-' || texto === '0';
+    };
 
-        // 1. TRATAMIENTO SEGURO DEL VALOR
-        const valorMatriz = valorRef ? valorRef.toString().trim() : "";
-        const valorUpper = valorMatriz.toUpperCase();
-        
-        // 2. FILTRO NA: Si es NA, lo ignoramos totalmente
-        if (valorUpper === 'NA') return;
-
-        // 3. CONTROL DE FILAS VACÍAS: 
-        // Si la celda está vacía pero NO es la primera (index > 0), saltamos para no repetir 6 filas de guiones.
-        if (valorMatriz === "" && index > 0) return;
-
-        // --- A partir de aquí se crea la fila ---
+    const escribirFila = (valores, esFilaNA = false) => {
         if (filaActual > FILA_BASE_PLANTILLA) {
             hojaDestino.insertRow(filaActual, {});
         }
@@ -40,27 +29,14 @@ function s2_4(hojaDestino, fEquip, filaReferenciaAnterior) {
         limpiarMergesFila(hojaDestino, filaActual);
         aplicarEstiloCelda(row);
 
-        const colIdx = celdaMatrizBase.col;
-        const esInvalido = valorMatriz === "-" || valorMatriz === "0" || valorMatriz === "";
-        if (esInvalido) {
-            row.getCell('B').value = "-";
-            row.getCell('C').value = "-";
-            row.getCell('E').value = "-";
-            row.getCell('F').value = "-";
-            row.getCell('G').value = "-";
-            row.getCell('I').value = "-";
-            row.getCell('K').value = "-";
-            row.getCell('M').value = "-";
-        } else {
-            row.getCell('B').value = itemCorrelativo++;
-            row.getCell('C').value = fEquip.getCell(colIdx).value || "-";
-            row.getCell('E').value = fEquip.getCell(colIdx + 1).value || "-";
-            row.getCell('F').value = fEquip.getCell(colIdx + 2).value || "-";
-            row.getCell('G').value = fEquip.getCell(colIdx + 3).value || "-";
-            row.getCell('I').value = fEquip.getCell(colIdx + 4).value || "-";
-            row.getCell('K').value = fEquip.getCell(colIdx + 5).value || "-";
-            row.getCell('M').value = fEquip.getCell(colIdx + 6).value || "-";
-        }
+        row.getCell('B').value = esFilaNA ? 'NA' : itemCorrelativo++;
+        row.getCell('C').value = valores[0] || (esFilaNA ? 'NA' : '-');
+        row.getCell('E').value = valores[1] || (esFilaNA ? 'NA' : '-');
+        row.getCell('F').value = valores[2] || (esFilaNA ? 'NA' : '-');
+        row.getCell('G').value = valores[3] || (esFilaNA ? 'NA' : '-');
+        row.getCell('I').value = valores[4] || (esFilaNA ? 'NA' : '-');
+        row.getCell('K').value = valores[5] || (esFilaNA ? 'NA' : '-');
+        row.getCell('M').value = valores[6] || (esFilaNA ? 'NA' : '-');
 
         try {
             hojaDestino.mergeCells(filaActual, 3, filaActual, 4);
@@ -68,8 +44,38 @@ function s2_4(hojaDestino, fEquip, filaReferenciaAnterior) {
             hojaDestino.mergeCells(filaActual, 9, filaActual, 10);
             hojaDestino.mergeCells(filaActual, 11, filaActual, 12);
         } catch (e) { }
+
+        if (esFilaNA) {
+            for (let col = 2; col <= 13; col++) {
+                row.getCell(col).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            }
+        }
+
         row.height = undefined;
         filaActual++;
+    };
+
+    const bloquesEvaluados = fEquip
+        ? iniciosColumnas.map((letraInicio) => {
+            const celdaBase = fEquip.getCell(letraInicio);
+            const colIdx = celdaBase.col;
+            const valores = Array.from({ length: 7 }, (_, index) => fEquip.getCell(colIdx + index).value);
+            const cantidadVacios = valores.filter(esVacio).length;
+            return { valores, cantidadVacios, tieneDatos: valores.some((valor) => !esVacio(valor)) };
+        })
+        : [];
+
+    const bloquesConDatos = bloquesEvaluados.filter(({ cantidadVacios, tieneDatos }) =>
+        tieneDatos && cantidadVacios <= 3
+    );
+    const primerBloqueTieneExcesoDeVacios = !bloquesEvaluados.length || bloquesEvaluados[0].cantidadVacios > 3;
+
+    if (bloquesConDatos.length === 0 || primerBloqueTieneExcesoDeVacios) {
+        escribirFila(Array(7).fill('NA'), true);
+    }
+
+    bloquesConDatos.forEach(({ valores }) => {
+        escribirFila(valores);
     });
 
     return filaActual;

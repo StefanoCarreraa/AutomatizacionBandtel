@@ -58,7 +58,7 @@ async function ejecutarAutomatizacion() {
         await libroLista.xlsx.readFile('input/Lista.xlsx');
 
         if (opcionTrim === '1' || opcionTrim === '3') {
-            await libroMatrizPasco.xlsx.readFile('input/Tabulado Acta de Nodo_PR-Pasco7.xlsx');
+            await libroMatrizPasco.xlsx.readFile('input/Tabulado Acta de Nodo_PR-Pasco8.xlsx');
         }
         if (opcionTrim === '2' || opcionTrim === '3') {
             await libroMatrizHuanuco.xlsx.readFile('input/Tabulado Acta de Nodo_PR-Huánuco5.xlsx');
