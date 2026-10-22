@@ -11,8 +11,6 @@ function s2_1(hojaDestino, fEquip) {
     });
 
     let filaActual = filaInicio !== -1 ? filaInicio : 21;
-    if (!fEquip) return filaActual;
-
     const FILA_FIN_TABLA_ORIGINAL = filaActual;
     let itemCorrelativo = 1;
 
@@ -23,70 +21,83 @@ function s2_1(hojaDestino, fEquip) {
         { c: 'OM', start: 404 }, { c: 'QE', start: 448 }, { c: 'RW', start: 491 }
     ];
 
-    configuracion.forEach((enlace) => {
-        let colMatriz = enlace.start;
-        for (let i = 0; i < 7; i++) {
-            // --- BLINDAJE: Obtenemos el valor de forma segura ---
-            const celdaRaw = fEquip.getCell(colMatriz);
-            const valorD_Raw = celdaRaw.value;
-            
-            // Si el valor es NA, saltamos esta iteración
-            if (valorD_Raw && valorD_Raw.toString().toUpperCase() === 'NA') {
-                colMatriz += 4; continue;
+    const esVacio = (valor) => {
+        if (valor === null || valor === undefined) return true;
+        const texto = valor.toString().trim().toUpperCase();
+        return texto === '' || texto === 'NA' || texto === '-' || texto === '0';
+    };
+
+    const registros = [];
+    if (fEquip) {
+        configuracion.forEach((enlace) => {
+            for (let i = 0; i < 7; i++) {
+                const colMatriz = enlace.start + i * 4;
+                const valores = [
+                    fEquip.getCell(enlace.c).value,
+                    fEquip.getCell(colMatriz).value,
+                    fEquip.getCell(colMatriz + 1).value,
+                    fEquip.getCell(colMatriz + 2).value,
+                    fEquip.getCell(colMatriz + 3).value
+                ];
+                const cantidadVacios = valores.filter(esVacio).length;
+
+                if (cantidadVacios <= 3) {
+                    registros.push({ valores });
+                }
             }
+        });
+    }
 
-            // Convertimos a string de forma segura
-            const valorD = valorD_Raw ? valorD_Raw.toString().trim() : "";
-
-            if (filaActual > FILA_FIN_TABLA_ORIGINAL) {
-                hojaDestino.insertRow(filaActual, {});
-            }
-
-            const row = hojaDestino.getRow(filaActual);
-            row.height = 30;
-
-            limpiarMergesFila(hojaDestino, filaActual);
-            aplicarEstiloCelda(row);
-
-            // --- LÓGICA DE VALIDACIÓN ---
-            // Consideramos inválido si es vacío, "-", o "0"
-            const esInvalido = valorD === "" || valorD === "-" || valorD === "0";
-
-            if (esInvalido) {
-                row.getCell('B').value = "-";
-                row.getCell('C').value = "-";
-                row.getCell('D').value = "-";
-                row.getCell('G').value = "-";
-                row.getCell('I').value = "-";
-                row.getCell('K').value = "-";
-                row.getCell('L').value = "-";
-            } else {
-                row.getCell('B').value = itemCorrelativo++; 
-                row.getCell('C').value = fEquip.getCell(enlace.c).value || "-";
-                row.getCell('D').value = valorD;
-                row.getCell('G').value = fEquip.getCell(colMatriz + 1).value || "-";
-                row.getCell('I').value = fEquip.getCell(colMatriz + 2).value || "-";
-                row.getCell('K').value = fEquip.getCell(colMatriz + 3).value || "-";
-                row.getCell('L').value = "-";
-            }
-
-            // 2. REALIZAR MERGES
-            try {
-                hojaDestino.mergeCells(filaActual, 4, filaActual, 6);  
-                hojaDestino.mergeCells(filaActual, 7, filaActual, 8);  
-                hojaDestino.mergeCells(filaActual, 9, filaActual, 10); 
-                hojaDestino.mergeCells(filaActual, 12, filaActual, 13);
-            } catch (e) { }
-
-            // Alineación forzada
-            const estiloFinal = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            for (let c = 2; c <= 13; c++) {
-                hojaDestino.getCell(filaActual, c).alignment = estiloFinal;
-            }
-
-            filaActual++;
-            colMatriz += 4;
+    const escribirFila = (valores, numero = 'NA') => {
+        if (filaActual > FILA_FIN_TABLA_ORIGINAL) {
+            hojaDestino.insertRow(filaActual, {});
         }
+
+        const row = hojaDestino.getRow(filaActual);
+        row.height = 30;
+        limpiarMergesFila(hojaDestino, filaActual);
+        aplicarEstiloCelda(row);
+
+        row.getCell('B').value = numero;
+        row.getCell('C').value = valores[0] || '-';
+        row.getCell('D').value = valores[1] || '-';
+        row.getCell('G').value = valores[2] || '-';
+        row.getCell('I').value = valores[3] || '-';
+        row.getCell('K').value = valores[4] || '-';
+        row.getCell('L').value = numero === 'NA' ? 'NA' : '-';
+
+        try {
+            hojaDestino.mergeCells(filaActual, 4, filaActual, 6);
+            hojaDestino.mergeCells(filaActual, 7, filaActual, 8);
+            hojaDestino.mergeCells(filaActual, 9, filaActual, 10);
+            hojaDestino.mergeCells(filaActual, 12, filaActual, 13);
+        } catch (e) { }
+
+        const estiloFinal = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        for (let c = 2; c <= 13; c++) {
+            hojaDestino.getCell(filaActual, c).alignment = estiloFinal;
+        }
+
+        filaActual++;
+    };
+
+    const primerRegistro = configuracion.length && fEquip
+        ? [
+            fEquip.getCell(configuracion[0].c).value,
+            fEquip.getCell(configuracion[0].start).value,
+            fEquip.getCell(configuracion[0].start + 1).value,
+            fEquip.getCell(configuracion[0].start + 2).value,
+            fEquip.getCell(configuracion[0].start + 3).value
+        ]
+        : null;
+    const primerRegistroTieneExcesoDeVacios = !primerRegistro || primerRegistro.filter(esVacio).length > 3;
+
+    if (registros.length === 0 || primerRegistroTieneExcesoDeVacios) {
+        escribirFila(Array(5).fill('NA'));
+    }
+
+    registros.forEach(({ valores }) => {
+        escribirFila(valores, itemCorrelativo++);
     });
 
     return filaActual;
