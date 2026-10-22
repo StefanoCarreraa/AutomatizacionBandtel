@@ -10,7 +10,6 @@ function s2_3(hojaDestino, fEquip, filaReferenciaAnterior) {
     });
 
     let filaActual = filaSeccion !== -1 ? filaSeccion + 2 : filaReferenciaAnterior + 3;
-    if (!fEquip) return filaActual;
 
     let itemCorrelativo = 1;
     const FILA_BASE_PLANTILLA = filaActual;
@@ -30,18 +29,51 @@ function s2_3(hojaDestino, fEquip, filaReferenciaAnterior) {
         { labelCols: ['TA', 'TB'], dataStart: 'TC' }
     ];
 
-    CONFIG_BLOQUES.forEach((bloque, index) => {
+    const escribirFilaNA = () => {
+        if (filaActual > FILA_BASE_PLANTILLA) {
+            hojaDestino.insertRow(filaActual, {});
+        }
+
+        const row = hojaDestino.getRow(filaActual);
+        limpiarMergesFila(hojaDestino, filaActual);
+        aplicarEstiloCelda(row);
+        for (let col = 2; col <= 13; col++) {
+            const cell = row.getCell(col);
+            cell.value = 'NA';
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        }
+        filaActual++;
+    };
+
+    if (!fEquip) {
+        escribirFilaNA();
+        return filaActual;
+    }
+
+    const bloquesEvaluados = CONFIG_BLOQUES.map((bloque) => {
+        const colBase = fEquip.getCell(bloque.dataStart).col;
+        const valores = Array.from({ length: 10 }, (_, index) => fEquip.getCell(colBase + index).value);
+        const valoresValidos = valores.filter((valor) => {
+            if (valor === null || valor === undefined) return false;
+            const texto = valor.toString().trim().toUpperCase();
+            return texto !== '' && texto !== 'NA' && texto !== '-' && texto !== '0';
+        });
+
+        return { bloque, cantidadVacios: valores.length - valoresValidos.length, tieneDatos: valoresValidos.length > 0 };
+    });
+
+    const bloquesConDatos = bloquesEvaluados.filter(({ cantidadVacios, tieneDatos }) =>
+        tieneDatos && cantidadVacios <= 3
+    );
+    const primerBloqueTieneExcesoDeVacios = bloquesEvaluados[0].cantidadVacios > 3;
+
+    if (bloquesConDatos.length === 0 || primerBloqueTieneExcesoDeVacios) {
+        escribirFilaNA();
+    }
+
+    bloquesConDatos.forEach(({ bloque }) => {
         const celdaBase = fEquip.getCell(bloque.dataStart);
-        // Tratamiento seguro contra null
         const valorRefRaw = celdaBase.value ? celdaBase.value.toString().trim() : "";
-        const valorUpper = valorRefRaw.toUpperCase();
-
-        // 1. FILTRO NA: Ignoramos totalmente si es NA
-        if (valorUpper === 'NA') return;
-
-        // 2. FILTRO DE FILAS VACÍAS:
-        // Si no hay datos y NO es el primer bloque, no creamos fila (evita saturar de guiones)
-        if (valorRefRaw === "" && index > 0) return;
 
         // Inserción de fila física
         if (filaActual > FILA_BASE_PLANTILLA) {
