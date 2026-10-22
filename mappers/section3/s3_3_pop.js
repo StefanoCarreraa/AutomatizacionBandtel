@@ -77,12 +77,12 @@ function s3_3(hojaDestino, fPop, filaInicio) {
             row.getCell('M').value = "-"; // SSID (M)
         } else {
             row.getCell('B').value = numItem;
-            row.getCell('C').value = valores[0];
+            row.getCell('C').value = valores[1];
             row.getCell('E').value = valores[2];
             row.getCell('G').value = valores[3];
             row.getCell('I').value = valores[4];
-            row.getCell('K').value = valores[5];
-            row.getCell('M').value = valores[1];
+            row.getCell('K').value = valores[0];
+            row.getCell('M').value = valores[5];
         }
         const safeMerge = (r, c1, c2) => {
             const cell = hojaDestino.getCell(r, c1);
